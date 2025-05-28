@@ -166,7 +166,7 @@ with tab1:
             daily_users.reset_index(), x='Signup_Date', y='User_ID',
             title="Daily Active Users (DAU)",
             labels={'User_ID': 'Users', 'Signup_Date': 'Date'},
-            color_discrete_sequence=px.colors.qualitative.Plotly,
+            color_discrete_sequence=['#2E86C1'],  # Changed to high-contrast blue
             height=500,
             width=1000
         )
@@ -181,20 +181,18 @@ with tab1:
         max_dau_day = daily_users.idxmax()
         max_dau_value = daily_users.max()
         fig_dau.add_scatter(x=[max_dau_day], y=[max_dau_value], mode='markers+text',
-            marker=dict(size=12, color='#FF5733'),
+            marker=dict(size=12, color='#FF5733'),  # Changed marker to orange
             text=[f"Peak: {int(max_dau_value)}"], textposition="top center",
             name="Peak DAU")
         st.plotly_chart(fig_dau, use_container_width=True)
         # WAU/MAU
-        weekly_users = filtered_df.groupby(filtered_df['Signup_Date'].dt.to_period('W'))['User_ID'].nunique()
-        monthly_users = filtered_df.groupby(filtered_df['Signup_Date'].dt.to_period('M'))['User_ID'].nunique()
-        wau_df = weekly_users.reset_index()
-        wau_df['Signup_Date'] = wau_df['Signup_Date'].astype(str)
-        fig_wau = px.line(
-            wau_df, x='Signup_Date', y='User_ID',
+        weekly_users = filtered_df.groupby(filtered_df['Signup_Date'].dt.to_period('W'))['User_ID'].nunique().reset_index()
+        weekly_users['Signup_Date'] = weekly_users['Signup_Date'].apply(lambda x: x.start_time)
+        fig_wau = px.bar(
+            weekly_users, x='Signup_Date', y='User_ID',
             title="Weekly Active Users (WAU)",
-            labels={'User_ID': 'Users', 'Signup_Date': 'Week'},
-            color_discrete_sequence=px.colors.qualitative.Set1,
+            labels={'User_ID': 'Users', 'Signup_Date': 'Week Start'},
+            color_discrete_sequence=['#27AE60'],  # High-contrast green
             height=400,
             width=900
         )
@@ -204,13 +202,15 @@ with tab1:
             xaxis_tickangle=-45
         )
         st.plotly_chart(fig_wau, use_container_width=True)
+        # MAU
+        monthly_users = filtered_df.groupby(filtered_df['Signup_Date'].dt.to_period('M'))['User_ID'].nunique()
         mau_df = monthly_users.reset_index()
         mau_df['Signup_Date'] = mau_df['Signup_Date'].astype(str)
         fig_mau = px.line(
             mau_df, x='Signup_Date', y='User_ID',
             title="Monthly Active Users (MAU)",
             labels={'User_ID': 'Users', 'Signup_Date': 'Month'},
-            color_discrete_sequence=px.colors.qualitative.Set2,
+            color_discrete_sequence=['#8E44AD'],  # High-contrast purple
             height=400,
             width=900
         )
@@ -228,7 +228,7 @@ with tab1:
             height=300,
             width=300,
             hole=0.4,
-            color_discrete_sequence=px.colors.qualitative.Pastel
+            color_discrete_sequence=['#FF5733', '#2E86C1', '#27AE60', '#F1C40F', '#8E44AD', '#E67E22']  # High-contrast
         )
         fig_device_share.update_layout(
             margin=dict(l=10, r=10, t=40, b=10),
@@ -238,13 +238,13 @@ with tab1:
 
 with tab2:
     st.header("Revenue Visualizations & Breakdown")
-    # Revenue over time (line)
+    # Revenue over time (line chart)
     revenue_daily = filtered_df.groupby(filtered_df['Signup_Date'].dt.date)['Total_Revenue_USD'].sum().reset_index()
     fig_rev_line = px.line(
         revenue_daily, x='Signup_Date', y='Total_Revenue_USD',
         title="Revenue Over Time (Daily)",
         labels={'Total_Revenue_USD': 'Revenue (USD)', 'Signup_Date': 'Date'},
-        color_discrete_sequence=px.colors.qualitative.Plotly,
+        color_discrete_sequence=['#034f84'],
         height=500,
         width=1000
     )
@@ -254,57 +254,61 @@ with tab2:
         xaxis_tickangle=-45
     )
     st.plotly_chart(fig_rev_line, use_container_width=True)
-    # Revenue by device
-    fig_rev_device = px.bar(
-        filtered_df.groupby('Device_Type')['Total_Revenue_USD'].sum().reset_index(),
-        x='Device_Type', y='Total_Revenue_USD',
-        title="Revenue by Device",
-        color='Device_Type',
-        color_discrete_sequence=px.colors.qualitative.Set1,
-        height=350,
-        width=700
-    )
-    # Add clear axis labels and color for revenue by device
-    fig_rev_device.update_traces(marker_color='#4F8BF9')
-    fig_rev_device.update_layout(
-        xaxis_title="Device Type",
-        yaxis_title="Revenue (USD)",
-        title_font_color="#4F8BF9",
-        font=dict(size=13)
-    )
-    st.plotly_chart(fig_rev_device, use_container_width=True)
-    # Revenue by segment
-    if 'Subscription_Tier' in filtered_df:
-        fig_rev_segment = px.bar(
-            filtered_df.groupby('Subscription_Tier')['Total_Revenue_USD'].sum().reset_index(),
-            x='Subscription_Tier', y='Total_Revenue_USD',
-            title="Revenue by User Segment (Subscription Tier)",
-            color='Subscription_Tier',
-            color_discrete_sequence=px.colors.qualitative.Set2,
-            height=300,
-            width=600
+    # --- Revenue breakdowns as pie charts side by side ---
+    rev_col1, rev_col2, rev_col3 = st.columns(3)
+    # Revenue by device (pie chart, vibrant colors)
+    with rev_col1:
+        fig_rev_device = px.pie(
+            filtered_df.groupby('Device_Type')['Total_Revenue_USD'].sum().reset_index(),
+            names='Device_Type', values='Total_Revenue_USD',
+            title="Revenue by Device",
+            color_discrete_sequence=['#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1', '#955251'],
+            hole=0.3,
+            height=350,
+            width=350
         )
-        fig_rev_segment.update_layout(
+        fig_rev_device.update_layout(
             font=dict(size=12),
-            margin=dict(l=20, r=10, t=30, b=30)
+            margin=dict(l=10, r=10, t=40, b=30),
+            legend=dict(font=dict(size=11))
         )
-        st.plotly_chart(fig_rev_segment, use_container_width=True)
-    # Revenue by game mode
-    if 'Preferred_Game_Mode' in filtered_df:
-        fig_rev_gamemode = px.bar(
-            filtered_df.groupby('Preferred_Game_Mode')['Total_Revenue_USD'].sum().reset_index(),
-            x='Preferred_Game_Mode', y='Total_Revenue_USD',
-            title="Revenue by Game Mode",
-            color='Preferred_Game_Mode',
-            color_discrete_sequence=px.colors.qualitative.Set3,
-            height=300,
-            width=600
-        )
-        fig_rev_gamemode.update_layout(
-            font=dict(size=12),
-            margin=dict(l=20, r=10, t=30, b=30)
-        )
-        st.plotly_chart(fig_rev_gamemode, use_container_width=True)
+        st.plotly_chart(fig_rev_device, use_container_width=True)
+    # Revenue by segment (pie chart, vibrant colors)
+    with rev_col2:
+        if 'Subscription_Tier' in filtered_df:
+            fig_rev_segment = px.pie(
+                filtered_df.groupby('Subscription_Tier')['Total_Revenue_USD'].sum().reset_index(),
+                names='Subscription_Tier', values='Total_Revenue_USD',
+                title="Revenue by User Segment",
+                color_discrete_sequence=['#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1', '#955251'],
+                hole=0.3,
+                height=350,
+                width=350
+            )
+            fig_rev_segment.update_layout(
+                font=dict(size=12),
+                margin=dict(l=10, r=10, t=40, b=30),
+                legend=dict(font=dict(size=11))
+            )
+            st.plotly_chart(fig_rev_segment, use_container_width=True)
+    # Revenue by game mode (pie chart, vibrant colors)
+    with rev_col3:
+        if 'Preferred_Game_Mode' in filtered_df:
+            fig_rev_gamemode = px.pie(
+                filtered_df.groupby('Preferred_Game_Mode')['Total_Revenue_USD'].sum().reset_index(),
+                names='Preferred_Game_Mode', values='Total_Revenue_USD',
+                title="Revenue by Game Mode",
+                color_discrete_sequence=['#FF6F61', '#6B5B95', '#88B04B', '#F7CAC9', '#92A8D1', '#955251'],
+                hole=0.3,
+                height=350,
+                width=350
+            )
+            fig_rev_gamemode.update_layout(
+                font=dict(size=12),
+                margin=dict(l=10, r=10, t=40, b=30),
+                legend=dict(font=dict(size=11))
+            )
+            st.plotly_chart(fig_rev_gamemode, use_container_width=True)
 
 with tab3:
     st.header("User Behavior & Engagement")
